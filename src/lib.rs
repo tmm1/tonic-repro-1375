@@ -18,10 +18,10 @@ pub async fn run_client_requests() {
         .await
         .unwrap();
 
-    info!("Example 1");
+    info!("Futures Channel");
 
     let mut stream = client
-        .example1(Input {
+        .futures_channel(Input {
             packets: 20,
             packet_size: 1000,
         })
@@ -33,10 +33,10 @@ pub async fn run_client_requests() {
         info!("Receiving message");
     }
 
-    info!("Example 2");
+    info!("async_stream!");
 
     let mut stream = client
-        .example2(Input {
+        .async_stream(Input {
             packets: 20,
             packet_size: 1000,
         })
@@ -48,10 +48,25 @@ pub async fn run_client_requests() {
         info!("Receiving message");
     }
 
-    info!("Example 3");
+    info!("tokio mpsc");
 
     let mut stream = client
-        .example3(Input {
+        .tokio_mpsc(Input {
+            packets: 20,
+            packet_size: 1000,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+
+    while let Some(_data) = stream.next().await {
+        info!("Receiving message");
+    }
+
+    info!("async-channel::bounded");
+
+    let mut stream = client
+        .async_channel(Input {
             packets: 20,
             packet_size: 1000,
         })
@@ -83,15 +98,16 @@ pub struct StreamerImpl;
 
 #[tonic::async_trait]
 impl streamer_server::Streamer for StreamerImpl {
-    type example1Stream = Pin<Box<dyn Stream<Item = Result<Data, Status>> + Send>>;
-    type example2Stream = Pin<Box<dyn Stream<Item = Result<Data, Status>> + Send>>;
-    type example3Stream = Pin<Box<dyn Stream<Item = Result<Data, Status>> + Send>>;
+    type FuturesChannelStream = Pin<Box<dyn Stream<Item = Result<Data, Status>> + Send>>;
+    type AsyncStreamStream = Pin<Box<dyn Stream<Item = Result<Data, Status>> + Send>>;
+    type TokioMpscStream = Pin<Box<dyn Stream<Item = Result<Data, Status>> + Send>>;
+    type AsyncChannelStream = Pin<Box<dyn Stream<Item = Result<Data, Status>> + Send>>;
 
-    async fn example1(
+    #[instrument(skip_all)]
+    async fn futures_channel(
         &self,
         request: Request<Input>,
-    ) -> Result<Response<Self::example1Stream>, Status> {
-        info!("Example 1");
+    ) -> Result<Response<Self::FuturesChannelStream>, Status> {
         let request = request.into_inner();
 
         let (mut tx, rx) = futures_channel(0);
@@ -110,14 +126,14 @@ impl streamer_server::Streamer for StreamerImpl {
                 }
             }
         });
-        Ok(Response::new(Box::pin(rx) as Self::example1Stream))
+        Ok(Response::new(Box::pin(rx) as Self::FuturesChannelStream))
     }
 
-    async fn example2(
+    #[instrument(skip_all)]
+    async fn async_stream(
         &self,
         request: Request<Input>,
-    ) -> Result<Response<Self::example2Stream>, Status> {
-        info!("Example 2");
+    ) -> Result<Response<Self::AsyncStreamStream>, Status> {
         let request = request.into_inner();
 
         let output = try_stream! {
@@ -133,14 +149,14 @@ impl streamer_server::Streamer for StreamerImpl {
             }
         };
 
-        Ok(Response::new(Box::pin(output) as Self::example2Stream))
+        Ok(Response::new(Box::pin(output) as Self::AsyncStreamStream))
     }
 
-    async fn example3(
+    #[instrument(skip_all)]
+    async fn tokio_mpsc(
         &self,
         request: Request<Input>,
-    ) -> Result<Response<Self::example3Stream>, Status> {
-        info!("Example 3");
+    ) -> Result<Response<Self::TokioMpscStream>, Status> {
         let request = request.into_inner();
 
         let (tx, rx) = tokio_channel(10);
@@ -160,6 +176,32 @@ impl streamer_server::Streamer for StreamerImpl {
             }
         });
         let rx = ReceiverStream::new(rx);
-        Ok(Response::new(Box::pin(rx) as Self::example3Stream))
+        Ok(Response::new(Box::pin(rx) as Self::TokioMpscStream))
+    }
+
+    #[instrument(skip_all)]
+    async fn async_channel(
+        &self,
+        request: Request<Input>,
+    ) -> Result<Response<Self::AsyncChannelStream>, Status> {
+        let request = request.into_inner();
+
+        let (tx, rx) = async_channel::bounded(10);
+
+        let _sender = tokio::spawn(async move {
+            for _ in 0..request.packets {
+                let mut new_message = Data {
+                    values: Vec::with_capacity(request.packet_size as usize),
+                };
+                for _ in 0..request.packet_size {
+                    new_message.values.push(fastrand::i32(..));
+                }
+                info!("Sending message");
+                if tx.send(Ok(new_message)).await.is_err() {
+                    break;
+                }
+            }
+        });
+        Ok(Response::new(Box::pin(rx) as Self::AsyncChannelStream))
     }
 }

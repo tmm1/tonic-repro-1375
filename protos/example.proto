@@ -4,9 +4,10 @@ package protos.example;
 
 
 service Streamer {
-    rpc example1(Input) returns (stream Data);
-    rpc example2(Input) returns (stream Data);
-    rpc example3(Input) returns (stream Data);
+    rpc FuturesChannel(Input) returns (stream Data);
+    rpc AsyncStream(Input) returns (stream Data);
+    rpc TokioMpsc(Input) returns (stream Data);
+    rpc AsyncChannel(Input) returns (stream Data);
 }
 
 message Input {
