@@ -5,7 +5,8 @@ use futures::channel::mpsc::channel as futures_channel;
 use futures::{SinkExt, Stream, StreamExt};
 use std::pin::Pin;
 use tokio::sync::mpsc::channel as tokio_channel;
-use tokio_stream::wrappers::ReceiverStream;
+use tokio::sync::mpsc::unbounded_channel as tokio_unbounded_channel;
+use tokio_stream::wrappers::{ReceiverStream, UnboundedReceiverStream};
 use tonic::transport::channel::Endpoint;
 use tonic::{Request, Response, Status};
 use tracing::{info, instrument};
@@ -77,10 +78,26 @@ pub async fn run_client_requests() {
     while let Some(_data) = stream.next().await {
         info!("Receiving message");
     }
+    
+    info!("tokio unbounded mpsc");
+
+    let mut stream = client
+        .unbounded_tokio_mpsc(Input {
+            packets: 20,
+            packet_size: 1000,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+
+    while let Some(_data) = stream.next().await {
+        info!("Receiving message");
+    }
+
 }
 
 pub fn setup_logging() {
-    let filter = EnvFilter::new("tonic_repo=info,client=info,server=info");
+    let filter = EnvFilter::new("tonic_repo=info,client=info,server=info,hyper=trace,tokio=trace");
 
     let fmt = tracing_subscriber::fmt::Layer::default();
 
@@ -101,6 +118,7 @@ impl streamer_server::Streamer for StreamerImpl {
     type FuturesChannelStream = Pin<Box<dyn Stream<Item = Result<Data, Status>> + Send>>;
     type AsyncStreamStream = Pin<Box<dyn Stream<Item = Result<Data, Status>> + Send>>;
     type TokioMpscStream = Pin<Box<dyn Stream<Item = Result<Data, Status>> + Send>>;
+    type UnboundedTokioMpscStream = Pin<Box<dyn Stream<Item = Result<Data, Status>> + Send>>;
     type AsyncChannelStream = Pin<Box<dyn Stream<Item = Result<Data, Status>> + Send>>;
 
     #[instrument(skip_all)]
@@ -176,6 +194,33 @@ impl streamer_server::Streamer for StreamerImpl {
             }
         });
         let rx = ReceiverStream::new(rx);
+        Ok(Response::new(Box::pin(rx) as Self::TokioMpscStream))
+    }
+
+    #[instrument(skip_all)]
+    async fn unbounded_tokio_mpsc(
+        &self,
+        request: Request<Input>,
+    ) -> Result<Response<Self::UnboundedTokioMpscStream>, Status> {
+        let request = request.into_inner();
+
+        let (tx, rx) = tokio_unbounded_channel();
+
+        let _sender = tokio::spawn(async move {
+            for _ in 0..request.packets {
+                let mut new_message = Data {
+                    values: Vec::with_capacity(request.packet_size as usize),
+                };
+                for _ in 0..request.packet_size {
+                    new_message.values.push(fastrand::i32(..));
+                }
+                info!("Sending message");
+                if tx.send(Ok(new_message)).is_err() {
+                    break;
+                }
+            }
+        });
+        let rx = UnboundedReceiverStream::new(rx);
         Ok(Response::new(Box::pin(rx) as Self::TokioMpscStream))
     }
 

@@ -7,6 +7,7 @@ service Streamer {
     rpc FuturesChannel(Input) returns (stream Data);
     rpc AsyncStream(Input) returns (stream Data);
     rpc TokioMpsc(Input) returns (stream Data);
+    rpc UnboundedTokioMpsc(Input) returns (stream Data);
     rpc AsyncChannel(Input) returns (stream Data);
 }
 
