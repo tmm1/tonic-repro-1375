@@ -9,6 +9,7 @@ edition = "2021"
 async-channel = "1.8.0"
 async-stream = "0.3.5"
 fastrand = "1.9.0"
+flume = { version = "0.10.14"} # , features = ["spin"] } # Spin doesn't change anything
 futures = "0.3.28"
 prost = "0.11.9"
 tokio = { version = "1.28.2", features = ["sync", "rt-multi-thread", "tokio-macros", "tracing"] }

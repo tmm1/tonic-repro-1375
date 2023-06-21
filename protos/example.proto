@@ -9,6 +9,7 @@ service Streamer {
     rpc TokioMpsc(Input) returns (stream Data);
     rpc UnboundedTokioMpsc(Input) returns (stream Data);
     rpc AsyncChannel(Input) returns (stream Data);
+    rpc Flume(Input) returns (stream Data);
 }
 
 message Input {

@@ -78,7 +78,7 @@ pub async fn run_client_requests() {
     while let Some(_data) = stream.next().await {
         info!("Receiving message");
     }
-    
+
     info!("tokio unbounded mpsc");
 
     let mut stream = client
@@ -94,6 +94,20 @@ pub async fn run_client_requests() {
         info!("Receiving message");
     }
 
+    info!("flume");
+
+    let mut stream = client
+        .flume(Input {
+            packets: 20,
+            packet_size: 1000,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+
+    while let Some(_data) = stream.next().await {
+        info!("Receiving message");
+    }
 }
 
 pub fn setup_logging() {
@@ -120,6 +134,7 @@ impl streamer_server::Streamer for StreamerImpl {
     type TokioMpscStream = Pin<Box<dyn Stream<Item = Result<Data, Status>> + Send>>;
     type UnboundedTokioMpscStream = Pin<Box<dyn Stream<Item = Result<Data, Status>> + Send>>;
     type AsyncChannelStream = Pin<Box<dyn Stream<Item = Result<Data, Status>> + Send>>;
+    type FlumeStream = Pin<Box<dyn Stream<Item = Result<Data, Status>> + Send>>;
 
     #[instrument(skip_all)]
     async fn futures_channel(
@@ -248,5 +263,33 @@ impl streamer_server::Streamer for StreamerImpl {
             }
         });
         Ok(Response::new(Box::pin(rx) as Self::AsyncChannelStream))
+    }
+
+    #[instrument(skip_all)]
+    async fn flume(
+        &self,
+        request: Request<Input>,
+    ) -> Result<Response<Self::AsyncChannelStream>, Status> {
+        let request = request.into_inner();
+
+        let (tx, rx) = flume::bounded(10);
+
+        let _sender = tokio::spawn(async move {
+            for _ in 0..request.packets {
+                let mut new_message = Data {
+                    values: Vec::with_capacity(request.packet_size as usize),
+                };
+                for _ in 0..request.packet_size {
+                    new_message.values.push(fastrand::i32(..));
+                }
+                info!("Sending message");
+                if tx.send_async(Ok(new_message)).await.is_err() {
+                    break;
+                }
+            }
+        });
+        Ok(Response::new(
+            Box::pin(rx.into_stream()) as Self::AsyncChannelStream
+        ))
     }
 }
