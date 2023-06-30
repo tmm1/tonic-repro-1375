@@ -1,3 +1,4 @@
+use crate::stream_wrapper::*;
 use async_stream::try_stream;
 use example::streamer_client::*;
 use example::*;
@@ -12,6 +13,8 @@ use tonic::{Request, Response, Status};
 use tracing::{info, instrument};
 use tracing_subscriber::filter::EnvFilter;
 use tracing_subscriber::{Layer, Registry};
+
+pub mod stream_wrapper;
 
 #[instrument]
 pub async fn run_client_requests() {
@@ -33,11 +36,10 @@ pub async fn run_client_requests() {
     while let Some(_data) = stream.next().await {
         info!("Receiving message");
     }
-
-    info!("async_stream!");
+    info!("tokio mpsc");
 
     let mut stream = client
-        .async_stream(Input {
+        .tokio_mpsc(Input {
             packets: 20,
             packet_size: 1000,
         })
@@ -49,10 +51,10 @@ pub async fn run_client_requests() {
         info!("Receiving message");
     }
 
-    info!("tokio mpsc");
+    info!("async_stream!");
 
     let mut stream = client
-        .tokio_mpsc(Input {
+        .async_stream(Input {
             packets: 20,
             packet_size: 1000,
         })
@@ -208,7 +210,7 @@ impl streamer_server::Streamer for StreamerImpl {
                 }
             }
         });
-        let rx = ReceiverStream::new(rx);
+        let rx = ReceiverStreamWrapper(ReceiverStream::new(rx));
         Ok(Response::new(Box::pin(rx) as Self::TokioMpscStream))
     }
 
