@@ -6,14 +6,14 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-channel = "1.8.0"
+async-channel = "2.3.1"
 async-stream = "0.3.6"
 fastrand = "1.9.0"
 flume = { version = "0.10.14"} # , features = ["spin"] } # Spin doesn't change anything
-futures = "0.3.28"
+futures = "0.3.31"
 futures-core = "0.3.31"
 prost = "0.13.5"
-tokio = { version = "1.43.0", features = ["sync", "rt-multi-thread", "tokio-macros", "tracing"] }
+tokio = { version = "1.45.0", features = ["sync", "rt-multi-thread", "tokio-macros", "tracing"] }
 tokio-stream = "0.1.17"
 tonic = "0.12.3"
 tracing = "0.1.41"
