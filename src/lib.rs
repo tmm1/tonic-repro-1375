@@ -22,7 +22,7 @@ pub async fn run_client_requests() {
         .await
         .unwrap();
 
-    info!("Futures Channel");
+    info!("\n\nFutures Channel");
 
     let mut stream = client
         .futures_channel(Input {
@@ -36,7 +36,7 @@ pub async fn run_client_requests() {
     while let Some(_data) = stream.next().await {
         info!("Receiving message");
     }
-    info!("tokio mpsc");
+    info!("\n\ntokio mpsc");
 
     let mut stream = client
         .tokio_mpsc(Input {
@@ -51,7 +51,7 @@ pub async fn run_client_requests() {
         info!("Receiving message");
     }
 
-    info!("async_stream!");
+    info!("\n\nasync_stream!");
 
     let mut stream = client
         .async_stream(Input {
@@ -66,7 +66,7 @@ pub async fn run_client_requests() {
         info!("Receiving message");
     }
 
-    info!("async-channel::bounded");
+    info!("\n\nasync-channel::bounded");
 
     let mut stream = client
         .async_channel(Input {
@@ -81,7 +81,7 @@ pub async fn run_client_requests() {
         info!("Receiving message");
     }
 
-    info!("tokio unbounded mpsc");
+    info!("\n\ntokio unbounded mpsc");
 
     let mut stream = client
         .unbounded_tokio_mpsc(Input {
@@ -96,7 +96,7 @@ pub async fn run_client_requests() {
         info!("Receiving message");
     }
 
-    info!("flume");
+    info!("\n\nflume");
 
     let mut stream = client
         .flume(Input {
