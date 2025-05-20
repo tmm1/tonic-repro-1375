@@ -208,6 +208,7 @@ impl streamer_server::Streamer for StreamerImpl {
                 if tx.send(Ok(new_message)).await.is_err() {
                     break;
                 }
+                tokio::task::yield_now().await;
             }
         });
         let rx = ReceiverStreamWrapper(ReceiverStream::new(rx));
